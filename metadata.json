@@ -1,0 +1,6 @@
+{
+  "name": "Aftrekcheck Meerdere Schades - Audatex / AZT",
+  "description": "Aftrekcheck voor Audatex / AZT bij meerdere schades. Berekening van voorbereidingstijd en materiaalconstante bij gecombineerd spuitwerk.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

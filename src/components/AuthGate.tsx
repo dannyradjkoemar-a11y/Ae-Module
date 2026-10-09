@@ -31,16 +31,14 @@ export const AuthGate: React.FC<AuthGateProps> = ({
   onAuthenticated,
   onOpenOwnerAdmin,
 }) => {
-  const [selectedUserEmail, setSelectedUserEmail] = useState(
-    config.users[0]?.email || 'DannyRadjkoemar@gmail.com'
-  );
+  const [emailInput, setEmailInput] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [masterPinInput, setMasterPinInput] = useState('');
   const [useMasterPin, setUseMasterPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // Show setup / QR code for the owner if first time
+  // Show setup / QR code for the user if requested
   const [showQrHelper, setShowQrHelper] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
 
@@ -48,7 +46,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({
   const [moduleClickCount, setModuleClickCount] = useState(0);
   const [secretUnlocked, setSecretUnlocked] = useState(false);
 
-  const selectedUser = config.users.find((u) => u.email === selectedUserEmail) || config.users[0];
+  // Find user by entered email
+  const matchedUser = config.users.find(
+    (u) => u.email.trim().toLowerCase() === emailInput.trim().toLowerCase()
+  );
 
   const handleModuleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,50 +69,59 @@ export const AuthGate: React.FC<AuthGateProps> = ({
     e.preventDefault();
     setError(null);
 
-    // 1. Check if Master Killswitch is triggered (and not logging in via owner master pin)
-    if (!config.masterAccessEnabled && (!useMasterPin || masterPinInput !== config.ownerMasterPin)) {
+    // Option A: Master PIN override
+    if (useMasterPin) {
+      if (masterPinInput.trim() === config.ownerMasterPin) {
+        const ownerUser = config.users.find((u) => u.role === 'owner') || config.users[0];
+        setActiveSessionUser(ownerUser);
+        onAuthenticated(ownerUser);
+        return;
+      } else {
+        setError('Onjuiste Master PIN code.');
+        return;
+      }
+    }
+
+    // 1. Verify email entered
+    if (!emailInput.trim()) {
+      setError('Vul uw e-mailadres in.');
+      return;
+    }
+
+    if (!matchedUser) {
+      setError('Er is geen account gevonden met dit e-mailadres. Neem contact op met de beheerder.');
+      return;
+    }
+
+    // 2. Check if Master Killswitch is triggered (and user is not owner)
+    if (!config.masterAccessEnabled && matchedUser.role !== 'owner') {
       setError(config.lockoutMessage);
       return;
     }
 
-    // 2. Check if user is blocked
-    if (!useMasterPin && selectedUser && selectedUser.status === 'blocked') {
-      setError('Uw toegang tot de applicatie is geblokkeerd door de beheerder.');
+    // 3. Check if user is blocked
+    if (matchedUser.status === 'blocked') {
+      setError('Uw account is geblokkeerd door de beheerder.');
+      return;
+    }
+
+    // 4. Verify 6-digit TOTP code
+    if (!totpCode.trim() || totpCode.trim().length !== 6) {
+      setError('Vul de 6-cijferige code uit uw Authenticator-app in.');
       return;
     }
 
     setIsVerifying(true);
 
     try {
-      // Option A: Master PIN override
-      if (useMasterPin) {
-        if (masterPinInput.trim() === config.ownerMasterPin) {
-          const ownerUser = config.users.find((u) => u.role === 'owner') || config.users[0];
-          setActiveSessionUser(ownerUser);
-          onAuthenticated(ownerUser);
-          return;
-        } else {
-          setError('Onjuiste Master PIN code.');
-          setIsVerifying(false);
-          return;
-        }
-      }
-
-      // Option B: TOTP Authenticator code check
-      if (!selectedUser) {
-        setError('Selecteer een geldige gebruiker.');
-        setIsVerifying(false);
-        return;
-      }
-
-      const isValid = await verifyTOTP(totpCode, selectedUser.secret);
+      const isValid = await verifyTOTP(totpCode, matchedUser.secret);
       if (isValid) {
-        setActiveSessionUser(selectedUser);
-        onAuthenticated(selectedUser);
+        setActiveSessionUser(matchedUser);
+        onAuthenticated(matchedUser);
       } else {
-        setError('Ongeldige of verlopen 6-cijferige Authenticator-code. Controleer de tijd op uw telefoon.');
+        setError('Onjuiste of verlopen Authenticator-code. Controleer de tijd op uw telefoon.');
       }
-    } catch (err) {
+    } catch {
       setError('Fout bij verifiëren van code.');
     } finally {
       setIsVerifying(false);
@@ -170,19 +180,23 @@ export const AuthGate: React.FC<AuthGateProps> = ({
               <>
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    Selecteer uw account:
+                    Uw e-mailadres:
                   </label>
-                  <select
-                    value={selectedUserEmail}
-                    onChange={(e) => setSelectedUserEmail(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-[#E8831A] focus:outline-hidden"
-                  >
-                    {config.users.map((u) => (
-                      <option key={u.id} value={u.email}>
-                        {u.name} ({u.role === 'owner' ? 'Eigenaar' : 'Collega'}) {u.status === 'blocked' ? '❌ [Geblokkeerd]' : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="email"
+                    required
+                    autoFocus
+                    placeholder="naam@bedrijf.nl"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#E8831A] focus:outline-hidden"
+                  />
+                  {matchedUser && (
+                    <div className="text-[11px] text-emerald-700 mt-1 flex items-center gap-1 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Account herkend: {matchedUser.name}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -190,14 +204,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                     <label className="block text-xs font-semibold text-gray-700">
                       6-Cijferige Authenticator Code:
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowQrHelper(!showQrHelper)}
-                      className="text-xs text-[#E8831A] hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                    >
-                      <QrCode className="w-3.5 h-3.5" />
-                      {showQrHelper ? 'Verberg QR' : 'Koppel Authenticator'}
-                    </button>
+                    {matchedUser && (
+                      <button
+                        type="button"
+                        onClick={() => setShowQrHelper(!showQrHelper)}
+                        className="text-xs text-[#E8831A] hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        {showQrHelper ? 'Verberg QR' : 'Koppel Authenticator'}
+                      </button>
+                    )}
                   </div>
 
                   <div className="relative">
@@ -206,7 +222,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                       inputMode="numeric"
                       pattern="[0-9]*"
                       maxLength={6}
-                      autoFocus
                       required
                       placeholder="000000"
                       value={totpCode}
@@ -216,7 +231,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                     <Smartphone className="w-5 h-5 text-gray-400 absolute left-3 top-4" />
                   </div>
                   <p className="text-[11px] text-gray-500 mt-1.5 text-center">
-                    Open Google of Microsoft Authenticator op uw telefoon en vul de huidige code in.
+                    Open Google of Microsoft Authenticator op uw telefoon en vul de 6 cijfers in.
                   </p>
                 </div>
               </>
@@ -269,10 +284,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({
           </form>
 
           {/* QR-code helper modal/accordion */}
-          {showQrHelper && selectedUser && (
+          {showQrHelper && matchedUser && (
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs space-y-3 animate-in fade-in">
               <div className="flex justify-between items-center">
-                <span className="font-bold text-gray-800">Authenticator koppelen: {selectedUser.name}</span>
+                <span className="font-bold text-gray-800">Authenticator koppelen: {matchedUser.name}</span>
                 <button
                   type="button"
                   onClick={() => setShowQrHelper(false)}
@@ -285,21 +300,21 @@ export const AuthGate: React.FC<AuthGateProps> = ({
               <div className="flex flex-col items-center">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                    getOtpAuthUrl(selectedUser.email, selectedUser.secret)
+                    getOtpAuthUrl(matchedUser.email, matchedUser.secret)
                   )}`}
                   alt="QR Code"
                   className="w-32 h-32 border p-1 bg-white rounded-md shadow-xs mb-2"
                 />
                 <span className="text-[11px] text-gray-500 text-center">
-                  Scan met Google Authenticator of voer onderstaande sleutel handmatig in:
+                  Scan met Google of Microsoft Authenticator of voer onderstaande sleutel handmatig in:
                 </span>
                 <div className="mt-2 flex items-center gap-1.5 w-full">
                   <code className="p-1.5 bg-white border border-gray-300 rounded font-mono text-[11px] text-[#E8831A] font-bold flex-1 text-center truncate">
-                    {selectedUser.secret}
+                    {matchedUser.secret}
                   </code>
                   <button
                     type="button"
-                    onClick={() => copySecret(selectedUser.secret)}
+                    onClick={() => copySecret(matchedUser.secret)}
                     className="p-1.5 bg-white border border-gray-300 rounded hover:bg-gray-100 text-[11px] flex items-center gap-1 shrink-0"
                   >
                     {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}

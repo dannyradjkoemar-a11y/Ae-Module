@@ -31,6 +31,7 @@ import { generateBase32Secret } from '../lib/totp';
 interface OwnerAdminModalProps {
   config: SecurityConfig;
   isOpen: boolean;
+  currentUser?: AppUser | null;
   onClose: () => void;
   onConfigUpdated: (newConfig: SecurityConfig) => void;
 }
@@ -38,10 +39,16 @@ interface OwnerAdminModalProps {
 export const OwnerAdminModal: React.FC<OwnerAdminModalProps> = ({
   config,
   isOpen,
+  currentUser,
   onClose,
   onConfigUpdated,
 }) => {
   const [activeTab, setActiveTab] = useState<'killswitch' | 'users' | 'adduser' | 'settings'>('killswitch');
+
+  // Strict PIN protection gate inside modal
+  const [isPinUnlocked, setIsPinUnlocked] = useState(false);
+  const [pinChallengeInput, setPinChallengeInput] = useState('');
+  const [pinError, setPinError] = useState('');
 
   // Form states for adding user
   const [newUserName, setNewUserName] = useState('');
@@ -59,6 +66,88 @@ export const OwnerAdminModal: React.FC<OwnerAdminModalProps> = ({
   const [customLockoutMsg, setCustomLockoutMsg] = useState(config.lockoutMessage);
 
   if (!isOpen) return null;
+
+  // STRICT ACCESS CONTROL: If logged in user is not owner, block immediately
+  if (currentUser && currentUser.role !== 'owner') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+        <div className="bg-white rounded-xl shadow-2xl border border-red-300 w-full max-w-md p-6 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+            <Lock className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-gray-900">Geen toegang tot Beheerpagina</h3>
+          <p className="text-xs text-gray-600">
+            Het beheerderspaneel en licentiebeheer is uitsluitend toegankelijk voor de eigenaar (Danny Radjkoemar).
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 bg-[#141B22] text-white rounded-lg text-xs font-semibold cursor-pointer"
+          >
+            Begrepen / Sluiten
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If opening from the login screen (not yet logged in as owner) require Master PIN verification first
+  if (!currentUser && !isPinUnlocked) {
+    const handleVerifyPinChallenge = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (pinChallengeInput.trim() === config.ownerMasterPin) {
+        setIsPinUnlocked(true);
+        setPinError('');
+      } else {
+        setPinError('Onjuiste Master PIN code.');
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
+        <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-sm p-6 space-y-4">
+          <div className="flex justify-between items-center border-b pb-3">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-[#E8831A]" />
+              <h3 className="font-bold text-sm text-[#141B22]">Eigenaarsverificatie</h3>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs text-gray-600">
+            Voer de Master PIN van de eigenaar in om toegang te krijgen tot het beheerpaneel:
+          </p>
+          <form onSubmit={handleVerifyPinChallenge} className="space-y-3">
+            <input
+              type="password"
+              autoFocus
+              required
+              placeholder="Master PIN..."
+              value={pinChallengeInput}
+              onChange={(e) => setPinChallengeInput(e.target.value)}
+              className="w-full p-2.5 border-2 border-gray-300 rounded-lg text-xs font-mono"
+            />
+            {pinError && <div className="text-xs text-red-600 font-medium">{pinError}</div>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold cursor-pointer"
+              >
+                Annuleren
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2 bg-[#E8831A] hover:bg-[#d0750f] text-white rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Inloggen
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const showFeedback = (msg: string) => {
     setActionNotice(msg);

@@ -1332,6 +1332,7 @@ export default function App() {
       <OwnerAdminModal
         config={securityConfig}
         isOpen={isOwnerModalOpen}
+        currentUser={currentUser}
         onClose={() => setIsOwnerModalOpen(false)}
         onConfigUpdated={(newCfg) => {
           setSecurityConfig(newCfg);

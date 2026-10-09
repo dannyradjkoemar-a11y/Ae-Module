@@ -31,6 +31,7 @@ import {
 } from './lib/security';
 import { AuthGate } from './components/AuthGate';
 import { OwnerAdminModal } from './components/OwnerAdminModal';
+import { CinematicIntro } from './components/CinematicIntro';
 
 interface VBTItem {
   id: string;
@@ -60,6 +61,9 @@ interface ParsedResult {
 }
 
 export default function App() {
+  // Cinematic film-style startup intro state
+  const [showIntro, setShowIntro] = useState(true);
+
   // Security and Auth state
   const [securityConfig, setSecurityConfig] = useState<SecurityConfig>(() => getInitialSecurityConfig());
   const [currentUser, setCurrentUser] = useState<AppUser | null>(() => getActiveSessionUser());
@@ -435,6 +439,11 @@ export default function App() {
   };
 
   const zelfCalc = calculateZelf();
+
+  // Show Cinematic 3D Studio Intro on first launch
+  if (showIntro) {
+    return <CinematicIntro onFinish={() => setShowIntro(false)} />;
+  }
 
   // If user is not authenticated or if master lock is active (and user is not owner) -> Show Auth Gate
   if (!currentUser || (!securityConfig.masterAccessEnabled && currentUser.role !== 'owner')) {

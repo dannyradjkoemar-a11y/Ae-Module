@@ -149,7 +149,7 @@ export const OwnerAdminModal: React.FC<OwnerAdminModalProps> = ({
   };
 
   const getOtpAuthUrl = (name: string, email: string, secret: string) => {
-    const issuer = 'Aftrekcheck';
+    const issuer = 'AE MODULE';
     const label = encodeURIComponent(`${issuer}:${email || name}`);
     return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&digits=6&period=30`;
   };
@@ -172,7 +172,7 @@ export const OwnerAdminModal: React.FC<OwnerAdminModalProps> = ({
 
     return `Beste ${user.name},
 
-Je hebt toegang gekregen tot de Audatex / AZT Aftrekcheck applicatie voor meerdere schades.
+Je hebt toegang gekregen tot het AE MODULE systeem.
 
 Om de applicatie veilig te kunnen gebruiken, maken we gebruik van een Authenticator-app op je telefoon (Google Authenticator of Microsoft Authenticator).
 
@@ -183,6 +183,8 @@ STAPPENPLAN OM JE EENMALIG AAN TE MELDEN:
 2. Open de Authenticator-app, kies 'Account toevoegen' en scan de QR-code via onderstaande link:
 ${qrUrl}
 
+(De accountnaam verschijnt in je Authenticator als "AE MODULE")
+
 Of voer handmatig deze geheime koppelingssleutel in:
 Sleutel: ${user.secret}
 Type: Tijdgebaseerd (TOTP / 30 seconden)
@@ -192,14 +194,14 @@ ${appUrl}
 
 4. Kies op het inlogscherm jouw account (${user.name}) en vul de actuele 6-cijferige code in die op jouw telefoon verschijnt.
 
-Veel succes met het calculeren!
+Veel succes!
 
 Met vriendelijke groet,
 Danny Radjkoemar`;
   };
 
   const handleOpenEmailClient = (user: AppUser) => {
-    const subject = encodeURIComponent(`Toegang & Handleiding Aftrekcheck voor ${user.name}`);
+    const subject = encodeURIComponent(`Toegang & Handleiding AE MODULE voor ${user.name}`);
     const body = encodeURIComponent(generateInviteEmailText(user));
     window.location.href = `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
   };

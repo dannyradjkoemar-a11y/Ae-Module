@@ -119,7 +119,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
   };
 
   const getOtpAuthUrl = (email: string, secret: string) => {
-    const issuer = 'Aftrekcheck';
+    const issuer = 'AE MODULE';
     const label = encodeURIComponent(`${issuer}:${email}`);
     return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&digits=6&period=30`;
   };
